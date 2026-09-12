@@ -1,3 +1,4 @@
 alpaca-py
+ib_async
 python-dotenv
 pandas
