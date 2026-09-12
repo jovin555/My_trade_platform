@@ -18,3 +18,16 @@ class Config:
     IBKR_HOST = os.getenv('IBKR_HOST', '127.0.0.1')
     IBKR_PORT = int(os.getenv('IBKR_PORT', '4002'))
     IBKR_CLIENT_ID = int(os.getenv('IBKR_CLIENT_ID', '1'))
+
+    # Software kill switch — must be explicitly set to true for real orders to be sent.
+    # This is independent of IBKR's own Read-Only API setting; both must allow orders
+    # for a live trade to actually happen.
+    TRADING_ENABLED = os.getenv('TRADING_ENABLED', 'false').lower() in ('1', 'true', 'yes')
+
+    SMA_FAST = int(os.getenv('SMA_FAST', '10'))
+    SMA_SLOW = int(os.getenv('SMA_SLOW', '30'))
+    DAILY_LOSS_LIMIT_PCT = float(os.getenv('DAILY_LOSS_LIMIT_PCT', '0.05'))
+
+    # Currency the IBKR account cash/equity is held in — used to convert equity into
+    # USD for position sizing since the default tickers trade in USD.
+    ACCOUNT_CURRENCY = os.getenv('ACCOUNT_CURRENCY', 'CAD')
