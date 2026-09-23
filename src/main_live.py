@@ -27,19 +27,20 @@ def main():
     logger.info('Starting live trading loop (TRADING_ENABLED=%s)', Config.TRADING_ENABLED)
     broker = IBKRBroker()
     broker.connect()
-    risk = RiskManager(Config.MAX_POSITION_PCT, Config.DAILY_LOSS_LIMIT_PCT)
+    risk = RiskManager(
+        Config.MAX_POSITION_PCT,
+        Config.DAILY_LOSS_LIMIT_PCT,
+        daily_profit_target_pct=Config.DAILY_PROFIT_TARGET_PCT,
+        weekly_profit_target_pct=Config.WEEKLY_PROFIT_TARGET_PCT,
+        monthly_profit_target_pct=Config.MONTHLY_PROFIT_TARGET_PCT,
+    )
     bot = TradingBot(broker, risk)
 
-    last_trading_day = None
     try:
         while True:
             now = datetime.now(MARKET_TZ)
             if is_market_open(now):
-                if last_trading_day != now.date():
-                    risk.start_new_day(broker.get_net_liquidation(Config.ACCOUNT_CURRENCY))
-                    last_trading_day = now.date()
-                    logger.info('New trading day %s — start equity %.2f %s', now.date(), risk.day_start_equity, Config.ACCOUNT_CURRENCY)
-                bot.run_once()
+                bot.run_once(now)
             else:
                 logger.info('Market closed (%s) — sleeping', now.strftime('%a %H:%M %Z'))
             time.sleep(Config.RUN_INTERVAL_SECONDS)

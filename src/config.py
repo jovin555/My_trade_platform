@@ -28,6 +28,12 @@ class Config:
     SMA_SLOW = int(os.getenv('SMA_SLOW', '30'))
     DAILY_LOSS_LIMIT_PCT = float(os.getenv('DAILY_LOSS_LIMIT_PCT', '0.05'))
 
+    # Profit targets — once reached, trading halts for the remainder of the period
+    # (resets automatically when the day/week/month rolls over). Set to '' to disable.
+    DAILY_PROFIT_TARGET_PCT = float(os.getenv('DAILY_PROFIT_TARGET_PCT')) if os.getenv('DAILY_PROFIT_TARGET_PCT') else 0.02
+    WEEKLY_PROFIT_TARGET_PCT = float(os.getenv('WEEKLY_PROFIT_TARGET_PCT')) if os.getenv('WEEKLY_PROFIT_TARGET_PCT') else 0.05
+    MONTHLY_PROFIT_TARGET_PCT = float(os.getenv('MONTHLY_PROFIT_TARGET_PCT')) if os.getenv('MONTHLY_PROFIT_TARGET_PCT') else 0.10
+
     # Currency the IBKR account cash/equity is held in — used to convert equity into
     # USD for position sizing since the default tickers trade in USD.
     ACCOUNT_CURRENCY = os.getenv('ACCOUNT_CURRENCY', 'CAD')

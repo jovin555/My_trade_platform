@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from src.config import Config
 from src.ibkr_broker import IBKRBroker
@@ -22,13 +23,27 @@ class TradingBot:
         return 0
 
     def _any_position_open(self) -> bool:
-        return any(pos.position != 0 for pos in self.broker.get_positions())
+        # Scoped to this bot's own tickers — other holdings in the account (e.g. manual
+        # trades) must not block this bot from opening a position.
+        return any(pos.position != 0 and pos.contract.symbol in Config.TICKERS for pos in self.broker.get_positions())
 
-    def run_once(self):
+    def run_once(self, now: datetime = None):
+        now = now or datetime.now(timezone.utc)
         equity_account_ccy = self.broker.get_net_liquidation(Config.ACCOUNT_CURRENCY)
         self.trade_logger.log_equity(equity_account_ccy, Config.ACCOUNT_CURRENCY)
+        self.risk.sync_periods(now.date(), equity_account_ccy)
+
         if self.risk.check_daily_loss(equity_account_ccy):
             logger.warning('Daily loss limit breached (%.2f -> %.2f %s) — trading halted for today', self.risk.day_start_equity, equity_account_ccy, Config.ACCOUNT_CURRENCY)
+            return
+        if self.risk.check_monthly_profit_target(equity_account_ccy):
+            logger.info('Monthly profit target reached (%.2f -> %.2f %s) — trading halted for the month', self.risk.month_start_equity, equity_account_ccy, Config.ACCOUNT_CURRENCY)
+            return
+        if self.risk.check_weekly_profit_target(equity_account_ccy):
+            logger.info('Weekly profit target reached (%.2f -> %.2f %s) — trading halted for the week', self.risk.week_start_equity, equity_account_ccy, Config.ACCOUNT_CURRENCY)
+            return
+        if self.risk.check_daily_profit_target(equity_account_ccy):
+            logger.info('Daily profit target reached (%.2f -> %.2f %s) — trading halted for today', self.risk.day_start_equity, equity_account_ccy, Config.ACCOUNT_CURRENCY)
             return
 
         # Tickers trade in USD; convert account equity so position sizing compares
