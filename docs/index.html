@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151c;
+    --border: #232733;
+    --text: #e7e9ee;
+    --muted: #8b93a3;
+    --green: #3ddc84;
+    --red: #ff5c5c;
+    --accent: #5b8def;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .card .value { font-size: 1.4rem; font-weight: 600; margin-top: 4px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .panel h2 { font-size: 1rem; margin: 0 0 12px; color: var(--text); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+  .buy { color: var(--green); }
+  .sell { color: var(--red); }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 12px 0; }
+  canvas { max-height: 320px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Live Trading Dashboard</h1>
+  <div class="sub" id="updated">Loading…</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Current Equity</div>
+      <div class="value" id="equity">–</div>
+    </div>
+    <div class="card">
+      <div class="label">Total P&amp;L</div>
+      <div class="value" id="pnl">–</div>
+    </div>
+    <div class="card">
+      <div class="label">P&amp;L %</div>
+      <div class="value" id="pnlPct">–</div>
+    </div>
+    <div class="card">
+      <div class="label">Trades</div>
+      <div class="value" id="tradeCount">–</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Equity Curve</h2>
+    <canvas id="equityChart"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>Trade History</h2>
+    <div id="tradesTableWrap"></div>
+  </div>
+</div>
+
+<script>
+async function loadJSON(path) {
+  const res = await fetch(path + '?_=' + Date.now());
+  if (!res.ok) return [];
+  return res.json();
+}
+
+function fmtMoney(n, ccy) {
+  return (n < 0 ? '-' : '') + (ccy || '') + ' ' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+async function render() {
+  const [trades, equity] = await Promise.all([
+    loadJSON('data/trades.json'),
+    loadJSON('data/equity.json'),
+  ]);
+
+  document.getElementById('updated').textContent = equity.length
+    ? 'Last updated ' + fmtTime(equity[equity.length - 1].timestamp)
+    : 'No data yet';
+
+  if (equity.length) {
+    const first = equity[0];
+    const last = equity[equity.length - 1];
+    const pnl = last.equity - first.equity;
+    const pnlPct = first.equity ? (pnl / first.equity) * 100 : 0;
+
+    document.getElementById('equity').textContent = fmtMoney(last.equity, last.currency);
+    const pnlEl = document.getElementById('pnl');
+    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmtMoney(pnl, last.currency);
+    pnlEl.className = 'value ' + (pnl >= 0 ? 'pos' : 'neg');
+    const pnlPctEl = document.getElementById('pnlPct');
+    pnlPctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+    pnlPctEl.className = 'value ' + (pnlPct >= 0 ? 'pos' : 'neg');
+  } else {
+    document.getElementById('equity').textContent = 'n/a';
+    document.getElementById('pnl').textContent = 'n/a';
+    document.getElementById('pnlPct').textContent = 'n/a';
+  }
+
+  document.getElementById('tradeCount').textContent = trades.length;
+
+  new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+      labels: equity.map(e => fmtTime(e.timestamp)),
+      datasets: [{
+        label: 'Equity',
+        data: equity.map(e => e.equity),
+        borderColor: '#5b8def',
+        backgroundColor: 'rgba(91,141,239,0.12)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b93a3', maxTicksLimit: 8 }, grid: { color: '#232733' } },
+        y: { ticks: { color: '#8b93a3' }, grid: { color: '#232733' } },
+      },
+    },
+  });
+
+  const wrap = document.getElementById('tradesTableWrap');
+  if (!trades.length) {
+    wrap.innerHTML = '<div class="empty">No trades yet.</div>';
+  } else {
+    const rows = trades.slice().reverse().map(t => `
+      <tr>
+        <td>${fmtTime(t.timestamp)}</td>
+        <td>${t.symbol}</td>
+        <td class="${t.action === 'BUY' ? 'buy' : 'sell'}">${t.action}</td>
+        <td>${t.qty}</td>
+        <td>${fmtMoney(t.price, t.currency)}</td>
+      </tr>
+    `).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+}
+
+render();
+</script>
+</body>
+</html>

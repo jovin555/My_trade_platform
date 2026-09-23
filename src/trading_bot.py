@@ -4,14 +4,16 @@ from src.config import Config
 from src.ibkr_broker import IBKRBroker
 from src.risk import RiskManager
 from src.strategy import sma_crossover_signal
+from src.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
 
 class TradingBot:
-    def __init__(self, broker: IBKRBroker, risk: RiskManager):
+    def __init__(self, broker: IBKRBroker, risk: RiskManager, trade_logger: TradeLogger = None):
         self.broker = broker
         self.risk = risk
+        self.trade_logger = trade_logger or TradeLogger()
 
     def _current_qty(self, symbol: str) -> float:
         for pos in self.broker.get_positions():
@@ -24,6 +26,7 @@ class TradingBot:
 
     def run_once(self):
         equity_account_ccy = self.broker.get_net_liquidation(Config.ACCOUNT_CURRENCY)
+        self.trade_logger.log_equity(equity_account_ccy, Config.ACCOUNT_CURRENCY)
         if self.risk.check_daily_loss(equity_account_ccy):
             logger.warning('Daily loss limit breached (%.2f -> %.2f %s) — trading halted for today', self.risk.day_start_equity, equity_account_ccy, Config.ACCOUNT_CURRENCY)
             return
@@ -56,14 +59,17 @@ class TradingBot:
                 logger.info('%s: BUY signal, qty=%d', symbol, qty)
                 if Config.TRADING_ENABLED:
                     self.broker.submit_market_order(symbol, qty, 'BUY')
+                    self.trade_logger.log_trade(symbol, 'BUY', qty, price)
                     position_open = True
                 else:
                     logger.info('%s: TRADING_ENABLED=false — order not sent (dry run)', symbol)
 
             elif signal == 'SELL' and qty_held > 0:
+                price = closes.iloc[-1]
                 logger.info('%s: SELL signal, qty=%d', symbol, qty_held)
                 if Config.TRADING_ENABLED:
                     self.broker.submit_market_order(symbol, qty_held, 'SELL')
+                    self.trade_logger.log_trade(symbol, 'SELL', qty_held, price)
                 else:
                     logger.info('%s: TRADING_ENABLED=false — order not sent (dry run)', symbol)
             else:
