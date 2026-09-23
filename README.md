@@ -40,6 +40,12 @@ IBKR has no static API key. Instead you run **IB Gateway** or **Trader Workstati
    python -m src.main_ibkr
    ```
 
+## Dashboard
+
+Live trades and P&L: **https://jovin555.github.io/My_trade_platform/**
+
+The live bot logs each fill and equity snapshot to `docs/data/*.json`; run `scripts/publish_dashboard.sh` to push updates so the dashboard reflects them. This repo is public and the dashboard shows real trade history and account equity — no account credentials are included.
+
 ## Project Structure
 
 - `src/config.py` — environment-driven configuration
@@ -47,7 +53,11 @@ IBKR has no static API key. Instead you run **IB Gateway** or **Trader Workstati
 - `src/main.py` — Alpaca entry point / connection check
 - `src/ibkr_broker.py` — IBKR (`ib_async`) trading client wrapper, connects to a running IB Gateway/TWS
 - `src/main_ibkr.py` — IBKR entry point / connection check
+- `src/trading_bot.py` — SMA crossover live-trading loop with risk guardrails
+- `src/trade_logger.py` — logs fills/equity to `docs/data/*.json` for the dashboard
+- `docs/index.html` — GitHub Pages dashboard (equity curve + trade history)
 
 ## Status
 
 Early scaffold — account connection and order submission only. Strategy, backtesting, and live-data ingestion are not yet implemented.
+
